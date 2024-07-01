@@ -5,37 +5,44 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"github.com/twilio/twilio-go/client/jwt"
 	"os"
+	"strconv"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
-func GenerateToken(roomName string) string {
+func GenerateToken(roomName string) (string, string) {
+	zoomKey := os.Getenv("ZOOM_VIDEO_SDK_KEY")
+	zoomSecret := os.Getenv("ZOOM_VIDEO_SDK_SECRET")
+	currentTime := time.Now().Unix()
+	tokenTTL, _ := strconv.ParseInt(os.Getenv("TOKEN_TTL"), 10, 0)
+	expiry := currentTime + tokenTTL
+	userIdentity := identity()
 
-	params := jwt.AccessTokenParams{
-		AccountSid:    os.Getenv("TWILIO_ACCOUNT_SID"),
-		SigningKeySid: os.Getenv("TWILIO_API_KEY_SID"),
-		Secret:        os.Getenv("TWILIO_API_SECRET_KEY"),
-		Identity:      identity(),
-	}
+	token := jwt.NewWithClaims(
+		jwt.SigningMethodHS256,
+		jwt.MapClaims{
+			"app_key":       zoomKey,
+			"role_type":     1,
+			"version":       1,
+			"tpc":           roomName,
+			"user_identity": userIdentity,
+			"iat":           currentTime,
+			"nbf":           currentTime,
+			"exp":           expiry,
+		},
+	)
 
-	jwtToken := jwt.CreateAccessToken(params)
-
-	videoGrant := &jwt.VideoGrant{
-		Room: roomName,
-	}
-
-	jwtToken.AddGrant(videoGrant)
-	token, err := jwtToken.ToJwt()
-
+	jwtToken, err := token.SignedString([]byte(zoomSecret))
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	return token
+	return jwtToken, userIdentity
 }
 
 func identity() string {
-
 	input, _ := rand.Prime(rand.Reader, 128)
 	hash := md5.Sum([]byte(input.String()))
 	return hex.EncodeToString(hash[:])

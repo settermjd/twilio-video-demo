@@ -3,12 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/joho/godotenv"
-	"github.com/rs/cors"
 	"log"
 	"net/http"
 	"video_app/helper"
 	"video_app/model"
+
+	"github.com/joho/godotenv"
+	"github.com/rs/cors"
 )
 
 func main() {
@@ -34,18 +35,18 @@ func loadEnv() {
 func roomHandler(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Content-Type", "application/json")
 	response := make(map[string]string)
-
 	var room model.Room
 
 	json.NewDecoder(request.Body).Decode(&room)
 
 	err := room.Validate()
-
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
 		response["message"] = err.Error()
 	} else {
-		response["jwt"] = helper.GenerateToken(room.Name)
+		jwtToken, userIdentity := helper.GenerateToken(room.Name)
+		response["jwt"] = jwtToken
+		response["userName"] = userIdentity
 	}
 
 	jsonResponse, err := json.Marshal(response)
